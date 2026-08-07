@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Iterable
 from typing import Annotated
 
@@ -9,8 +8,9 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.lib.auth import AuthError, TokenExpiredError, TokenPayload, decode_token
 
-# Everything not listed here requires a valid access token: the default is deny,
-# so forgetting to guard a new route fails closed instead of leaking it.
+# Всё, чего нет в этом списке, требует валидного access-токена: политика
+# «запрещено по умолчанию», поэтому забытый guard на новом роуте закрывает его,
+# а не открывает наружу.
 DEFAULT_PUBLIC_PATHS = (
     "/health",
     "/docs",
@@ -23,14 +23,14 @@ DEFAULT_PUBLIC_PATHS = (
 
 
 class AuthMiddleware:
-    """Pure ASGI middleware that turns a Bearer token into `request.state.principal`.
+    """Чистый ASGI-middleware: превращает Bearer-токен в `request.state.principal`.
 
-    Written against the raw ASGI interface rather than `BaseHTTPMiddleware`
-    because that base class spawns an anyio task group per request — needless
-    overhead on a hot path that only reads one header.
+    Написан на голом ASGI, а не через `BaseHTTPMiddleware`, потому что тот
+    поднимает anyio task group на каждый запрос — лишние накладные расходы на
+    горячем пути, который всего лишь читает один заголовок.
 
-    Install it *before* CORSMiddleware so CORS ends up on the outside and even
-    rejected requests come back with the right CORS headers:
+    Подключать нужно *до* CORSMiddleware, чтобы CORS оказался снаружи и даже
+    отклонённые запросы возвращались с правильными CORS-заголовками:
 
         app.add_middleware(AuthMiddleware)
         app.add_middleware(CORSMiddleware, ...)
@@ -46,8 +46,8 @@ class AuthMiddleware:
         self.public_paths = tuple(public_paths)
 
     def _is_public(self, path: str) -> bool:
-        # Prefix match on a path segment boundary, so "/health" cannot be used
-        # to slip past "/health-internal".
+        # Префикс сверяется по границе сегмента пути, чтобы через "/health"
+        # нельзя было проскочить в "/health-internal".
         return any(
             path == public or path.startswith(f"{public}/")
             for public in self.public_paths
@@ -58,7 +58,7 @@ class AuthMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # CORS preflight carries no credentials by design.
+        # CORS-preflight по спецификации ходит без учётных данных.
         if scope["method"] == "OPTIONS" or self._is_public(scope["path"]):
             await self.app(scope, receive, send)
             return
@@ -78,11 +78,11 @@ class AuthMiddleware:
         except TokenExpiredError:
             await self._reject(scope, receive, send, "token has expired")
             return
-        except AuthError as exc:
+        except AuthError:
             await self._reject(scope, receive, send, "could not validate credentials")
             return
 
-        # Starlette exposes scope["state"] as request.state downstream.
+        # Starlette отдаёт scope["state"] вниз по стеку как request.state.
         scope.setdefault("state", {})["principal"] = principal
         await self.app(scope, receive, send)
 
@@ -98,11 +98,11 @@ class AuthMiddleware:
 
 
 async def get_principal(request: Request) -> TokenPayload:
-    """FastAPI dependency reading the principal AuthMiddleware attached."""
+    """Зависимость FastAPI: читает принципала, положенного AuthMiddleware."""
     principal = request.scope.get("state", {}).get("principal")
     if principal is None:
-        # Reachable only if the route is in public_paths but asks for a
-        # principal anyway — a wiring mistake, not a client error.
+        # Достижимо, только если роут попал в public_paths, но при этом просит
+        # принципала, — то есть ошибка сборки приложения, а не клиента.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="not authenticated",
@@ -115,9 +115,9 @@ CurrentPrincipal = Annotated[TokenPayload, Depends(get_principal)]
 
 
 def require_role(*allowed_roles: str):
-    """Route guard for authorization: `Depends(require_role("admin"))`.
+    """Guard авторизации для роута: `Depends(require_role("admin"))`.
 
-    Authentication is already done by the middleware; this only checks the role.
+    Аутентификацию уже сделал middleware, здесь проверяется только роль.
     """
 
     async def dependency(principal: CurrentPrincipal) -> TokenPayload:

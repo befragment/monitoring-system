@@ -14,13 +14,13 @@ CleanupCallback = Callable[[], Awaitable[None]]
 
 
 class GracefulShutdown:
-    """Ordered cleanup registry.
+    """Упорядоченный реестр процедур очистки.
 
-    Uvicorn already stops accepting connections and drains in-flight requests
-    when it receives SIGTERM/SIGINT; only then does it run the lifespan
-    shutdown. This class handles what comes after that: releasing external
-    resources in reverse registration order, under a total time budget, so a
-    hung dependency cannot keep the process alive forever.
+    Uvicorn по SIGTERM/SIGINT сам перестаёт принимать соединения и дожидается
+    завершения запросов в работе, и только потом запускает shutdown у lifespan.
+    Этот класс отвечает за то, что происходит после: освобождает внешние
+    ресурсы в порядке, обратном регистрации, и укладывается в общий бюджет
+    времени, чтобы зависшая зависимость не держала процесс живым вечно.
     """
 
     def __init__(self, timeout: float) -> None:
@@ -40,7 +40,7 @@ class GracefulShutdown:
                         await callback()
                         logger.info("shutdown: closed %s", name)
                     except Exception:
-                        # One resource failing must not strand the others.
+                        # Падение одного ресурса не должно бросать остальные.
                         logger.exception("shutdown: failed to close %s", name)
         except TimeoutError:
             logger.error(
@@ -53,10 +53,10 @@ shutdown = GracefulShutdown(timeout=settings.shutdown_timeout)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Wire into FastAPI with `FastAPI(lifespan=lifespan)`.
+    """Подключается к FastAPI через `FastAPI(lifespan=lifespan)`.
 
-    Dependencies are verified on the way up so the process fails fast on a bad
-    config instead of serving 500s, and torn down on the way out.
+    Зависимости проверяются на старте, чтобы процесс падал сразу при кривом
+    конфиге, а не отдавал 500-е, и закрываются на выходе.
     """
     await postgres.ping()
     logger.info("startup: postgres reachable")

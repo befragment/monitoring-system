@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 import jwt
 
@@ -13,7 +13,7 @@ REQUIRED_CLAIMS = ("sub", "role", "type", "jti", "iat", "exp")
 
 
 class AuthError(Exception):
-    """Base class for token problems raised by the pure functions below."""
+    """Базовый класс проблем с токеном, которые бросают функции ниже."""
 
 
 class TokenExpiredError(AuthError):
@@ -75,8 +75,8 @@ def create_refresh_token(subject: str | uuid.UUID, role: str) -> str:
 
 
 def _payload_from_claims(raw: dict[str, Any]) -> TokenPayload:
-    """Claim presence is already enforced by PyJWT's `require` option, so this
-    only has to pin down the types."""
+    """Наличие claims уже проверил PyJWT через опцию `require`, поэтому здесь
+    остаётся только зафиксировать типы."""
     sub, role, token_type, jti = (raw["sub"], raw["role"], raw["type"], raw["jti"])
     if not all(isinstance(value, str) for value in (sub, role, token_type, jti)):
         raise InvalidTokenError("malformed token payload")
@@ -91,10 +91,10 @@ def _payload_from_claims(raw: dict[str, Any]) -> TokenPayload:
 
 
 def decode_token(token: str, expected_type: TokenType = "access") -> TokenPayload:
-    """Verify signature and expiry, then check the token is of the right kind.
+    """Проверяет подпись и срок, затем сверяет, что тип токена тот самый.
 
-    Without the type check a long-lived refresh token would be accepted
-    everywhere an access token is.
+    Без проверки типа долгоживущий refresh-токен принимался бы везде, где
+    ожидается access.
     """
     try:
         raw = jwt.decode(
@@ -112,3 +112,30 @@ def decode_token(token: str, expected_type: TokenType = "access") -> TokenPayloa
     if payload.type != expected_type:
         raise InvalidTokenError(f"expected a {expected_type} token")
     return payload
+
+
+class TokenIssuerInterface(Protocol):
+    """Выдача токенов как порт.
+
+    Нужен, чтобы сервис входа проверялся без разбора JWT: подделка возвращает
+    строку «token-for-<id>», и тест читает её глазами вместо того, чтобы
+    декодировать подпись ради проверки, что роль легла в нужный claim.
+    """
+
+    def issue_access(self, subject: str, role: str) -> str: ...
+
+    def issue_refresh(self, subject: str, role: str) -> str: ...
+
+
+class TokenIssuer:
+    """Рабочая реализация — тонкая обёртка над функциями выше.
+
+    Класс, а не сами функции, потому что сервису передают объект: подменить
+    модульную функцию можно только патчингом, а объект — просто аргументом.
+    """
+
+    def issue_access(self, subject: str, role: str) -> str:
+        return create_access_token(subject, role)
+
+    def issue_refresh(self, subject: str, role: str) -> str:
+        return create_refresh_token(subject, role)

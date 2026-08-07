@@ -11,10 +11,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # App
+    # Приложение
     app_name: str = "monitoring-system"
     debug: bool = False
     shutdown_timeout: float = 30.0
+    # Через запятую, а не list[str]: pydantic-settings требует для сложных типов
+    # JSON, что в .env-файле писать невыносимо.
+    cors_origins: str = ""
 
     # Postgres
     postgres_user: str
@@ -32,7 +35,7 @@ class Settings(BaseSettings):
     redis_db: int = 0
     redis_max_connections: int = 20
 
-    # Auth
+    # Аутентификация
     secret_key: SecretStr
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -48,6 +51,10 @@ class Settings(BaseSettings):
                 "generate one with `openssl rand -hex 32`"
             )
         return value
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def database_url(self) -> str:

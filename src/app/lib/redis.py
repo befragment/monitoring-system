@@ -9,22 +9,22 @@ pool = ConnectionPool.from_url(
     health_check_interval=30,
 )
 
-# redis-py's asyncio client is safe to share across tasks: every command
-# checks a connection out of the pool for its duration.
+# Асинхронный клиент redis-py безопасно шарить между задачами: на время каждой
+# команды соединение берётся из пула и возвращается обратно.
 client = Redis(connection_pool=pool)
 
 
 async def get_redis() -> Redis:
-    """FastAPI dependency."""
+    """Зависимость FastAPI."""
     return client
 
 
 async def ping() -> bool:
-    """Liveness probe for Redis."""
+    """Проба доступности Redis."""
     return await client.ping()
 
 
 async def close() -> None:
-    """Release the connection pool. Called on shutdown."""
+    """Освобождает пул соединений. Вызывается при остановке приложения."""
     await client.aclose()
     await pool.aclose()

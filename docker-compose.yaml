@@ -54,6 +54,17 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    # В slim-образе нет curl, поэтому пробуем интерпретатором, который там уже есть.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   postgres_data:

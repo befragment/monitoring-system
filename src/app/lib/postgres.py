@@ -32,7 +32,7 @@ async_session_factory = async_sessionmaker(
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency. Commit is left to the service layer."""
+    """Зависимость FastAPI. Коммит остаётся на сервисном слое."""
     async with async_session_factory() as session:
         try:
             yield session
@@ -42,12 +42,12 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def ping() -> bool:
-    """Liveness probe for the database."""
+    """Проба доступности БД."""
     async with engine.connect() as conn:
         await conn.execute(text("SELECT 1"))
     return True
 
 
 async def close() -> None:
-    """Close every pooled connection. Called on shutdown."""
+    """Закрывает все соединения пула. Вызывается при остановке приложения."""
     await engine.dispose()

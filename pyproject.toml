@@ -24,4 +24,13 @@ dev = [
     "alembic>=1.19.0",
     "httpx>=0.28.1",
     "psycopg2-binary>=2.9.12",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+# Тесты сервисов асинхронные целиком; режим auto избавляет от декоратора
+# на каждой функции.
+asyncio_mode = "auto"

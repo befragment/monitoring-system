@@ -6,9 +6,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Install dependencies first so this layer is cached while only source changes.
-# The dev group (alembic, psycopg2-binary) ships in the runtime image too since
-# the `migrate` service reuses it to run `alembic upgrade head`.
+# Зависимости ставим первыми, чтобы слой кэшировался, пока меняются только исходники.
+# Группа dev (alembic, psycopg2-binary) попадает и в рантайм-образ: сервис
+# migrate переиспользует его для запуска `alembic upgrade head`.
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
